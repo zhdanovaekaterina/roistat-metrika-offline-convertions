@@ -109,7 +109,7 @@ def get_metrika_data(counter):
     params = dict(
     ids = METRIC_IDS,
     metrics = "ym:s:visits",
-    dimensions = "ym:s:visitID,ym:s:paramsLevel2",
+    dimensions = "ym:s:clientID,ym:s:paramsLevel2",
     date1 = "yesterday",
     date2 = "yesterday",
     accuracy="full",
@@ -138,8 +138,11 @@ def merge_data(roistat_data, metrika_data, file_name):
     joined_data = pd.merge(roistat_data, metrika_data)
     joined_data = joined_data.drop(['roistat', 'id', 'source_type', 'status'], axis=1)
     joined_data.insert(1, 'Target', 'test_target_lead')
+    joined_data.insert(1, 'Price', 0)
+    joined_data.insert(1, 'Currency', 'RUB')
+
     joined_data.rename(columns={'creation_date': 'DateTime'}, inplace=True)
-    joined_data = joined_data.reindex(columns=['ClientId', 'Target', 'DateTime'])
+    joined_data = joined_data.reindex(columns=['ClientId', 'Target', 'DateTime', 'Price', 'Currency'])
     joined_data.to_csv(f'{file_name}_{yesterday}.csv', index=False)
 
 def upload_data(counter_id, data):
