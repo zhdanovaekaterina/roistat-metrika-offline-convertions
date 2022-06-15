@@ -20,15 +20,28 @@ request_headers = {'Api-key': config.roistat_token,
 clients = [config.clients[0], config.clients[1]]
 counters = [config.counter_1, config.counter_2]
 
-yesterday = str(date.today() - timedelta(days=1))
-start_date = f'{yesterday}T00:00:00'
-end_date = f'{yesterday}T23:59:59'
+# TODO: Добавить формат 0Х, если время состоит из 1 цифры
+# TODO: Вынести установку начального и конечного времени в отдельную функцию
+time_zone = config.time_zone
+start_time_rs = str(24 - ((time_zone + 24) % 24))
+end_time_rs = str(23 - ((time_zone + 24) % 24))
+if time_zone < 0:
+    first_day = str(date.today() - timedelta(days=1))
+    second_day = str(date.today())
+else:
+    first_day = str(date.today() - timedelta(days=2))
+    second_day = str(date.today() - timedelta(days=1))
+start_date = f'{first_day}T{start_time_rs}:00:00+0000'               # Время по UTC+0
+end_date = f'{second_day}T{end_time_rs}:59:59+0000'
 
 
 def time_convertion(date_time:str):
-    '''Принимает значение даты и времени в формате строки. Возвращает время в формате timestamp (в секундах).'''
+    '''Принимает значение даты и времени в формате строки в UTC+0. Возвращает время в формате timestamp (в секундах) в UTC+3.'''
     date_time = date_time[:10] + ' ' + date_time[11:19]
-    date_time_obj = dt.datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S')
+    if time_zone < 0:                                                 # Конвертация часового пояса
+        date_time_obj = dt.datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S') - timedelta(hours=abs(time_zone))
+    else:
+        date_time_obj = dt.datetime.strptime(date_time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=time_zone)
     date_time_obj = round(date_time_obj.timestamp())
     return date_time_obj
 
@@ -46,12 +59,12 @@ def get_all_statuses():
         key = data['data'][i]['id']
         value = data['data'][i]['name']
         statuses[key] = value
-  
+
     return statuses
 
 def get_target_statuses(all_statuses:dict):
     '''Принимает словарь из ID и значений статусов. Возвращает список ID целевых статусов.'''
-    non_target_statuses = ('Не обработан', 'Не целевой')
+    non_target_statuses = ('Не обработан', 'Не целевой', 'Закрыто и не реализовано')
     target_statuses_dict = {}
     for k, v in all_statuses.items():
         if v not in non_target_statuses:
@@ -82,7 +95,7 @@ def get_all_deals(start_date:str, end_date:str):
 
 def get_roistat_target_deals(data):
     '''Принимает массив сделок. Возвращает дата фрейм из сделок, которые находятся на целевых статусах и имеют численное значение roistat id.'''
-    non_target_statuses = ('1001', '1003')
+    non_target_statuses = ('1001', '1003', '13')
     fields_to_export = ['roistat', 'id', 'source_type', 'creation_date']
     deals = []
     for i in range(len(data['data'])):
@@ -143,7 +156,7 @@ def merge_data(roistat_data, metrika_data, file_name):
 
     joined_data.rename(columns={'creation_date': 'DateTime'}, inplace=True)
     joined_data = joined_data.reindex(columns=['ClientId', 'Target', 'DateTime', 'Price', 'Currency'])
-    joined_data.to_csv(f'{file_name}_{yesterday}.csv', index=False)
+    joined_data.to_csv(f'{file_name}_joined_{second_day}.csv', index=False)
 
 def upload_data(counter_id, data):
     '''Получает номер счетчика и имя файла в текущей директории, готового к загрузке. Загружает данные в Метрику, возвращает в консоль время загрузки и статус ответа.'''
@@ -151,20 +164,20 @@ def upload_data(counter_id, data):
     counter = counter_id
     token = config.metrika_token
 
-    file = open(f"{data}_{yesterday}.csv", "r").read()
+    file = open(f"{data}_joined_{second_day}.csv", "r").read()
     id_type = "CLIENT_ID"
-    comment = f'Целевые за {yesterday}, тест'
+    comment = f'Целевые за {second_day}, тест'
 
-    url = "https://api-metrika.yandex.net/management/v1/counter/{}/offline_conversions/upload?client_id_type={}& [comment={}]".format(counter, id_type, comment)
+    url = "https://api-metrika.yandex.net/management/v1/counter/{}/offline_conversions/upload?client_id_type={}& [comment=<{}>]".format(counter, id_type, comment)
     headers = {
     "Authorization": "OAuth {}".format(token)
     }
 
     request = req.post(url, headers=headers, files={"file":file})
     if request.status_code == 200:
-        logging.info(f'Данные за {yesterday} успешно загружены в Метрику {datetime.now()}')
+        logging.info(f'Данные за {second_day} успешно загружены в Метрику {datetime.now()}')
     else:
-        logging.info(f'Данные за {yesterday} не загружены в Метрику. Код ответа: {request.status_code}')
+        logging.info(f'Данные за {second_day} не загружены в Метрику. Код ответа: {request.status_code}')
 
 def main():
     data = get_all_deals(start_date, end_date)

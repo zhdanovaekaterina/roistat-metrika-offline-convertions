@@ -4,3 +4,4 @@ venv
 *.json
 *.xlsx
 *.csv
+data_to_check*
