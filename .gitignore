@@ -5,3 +5,7 @@ venv
 *.xlsx
 *.csv
 data_to_check*
+*.txt
+*.bat
+logs
+*.ini
