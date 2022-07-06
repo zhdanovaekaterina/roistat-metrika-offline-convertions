@@ -186,7 +186,7 @@ def get_metrika_data(counter, first_date, second_date):
     dict_keys = dict_data[0].keys()
     df = pd.DataFrame.from_dict(dict_data, orient='index', columns=dict_keys)
 
-    return (df)
+    return df
 
 
 def merge_data(roistat_data, metrika_data, file_name, file_date):
